@@ -1,0 +1,6 @@
+{
+    "dev": {
+        "app_function": "app.app", 
+        "s3_bucket": "zappa-rd50b1dj5"
+    }
+}
