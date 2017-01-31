@@ -140,7 +140,7 @@ def temp_history_chart(chartID, chart_height):
         "zoomType": 'x'
     }
 
-    localize = lambda t: utctz.localize(t).astimezone(localtz).timetuple()
+    localize = lambda t: t.timetuple() #pytz.utc.localize(t).astimezone(localtz).timetuple()
 
     series = [
         {

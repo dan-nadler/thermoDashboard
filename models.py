@@ -34,10 +34,22 @@ class Sensor(Base):
     location = Column(String(250))
     temperatures = relationship('Temperature')
     serial_number = Column(String(250))
+    user = Column(Integer, ForeignKey('user.id'))
 
     def __repr__(self):
         return self.location
 
+
+class User(Base):
+    __tablename__ = 'user'
+    id = Column(Integer, autoincrement=True, primary_key=True)
+    sensors = relationship('Sensor')
+    first_name = Column(String(150))
+    last_name = Column(String(150))
+    address = Column(String(250))
+
+    def __repr__(self):
+        return "{0}: {1} {2}".format(self.id, self.first_name, self.last_name)
 
 if __name__ == '__main__':
     engine = get_engine()
