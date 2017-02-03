@@ -4,14 +4,14 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 import time
 import pytz
-from flask import Flask, render_template
+from flask import Flask, render_template, request
+from local_settings import LOCALTZ
 
-localtz = pytz.timezone('America/New_York')
+localtz = pytz.timezone(LOCALTZ)
 
 class Cache(object):
     def __init__(self, cache_duration_seconds=60):
         """
-        :param lookback:
         :param cache_duration_seconds: duration of cached in seconds
         """
         self.cache_duration = cache_duration_seconds
@@ -19,13 +19,22 @@ class Cache(object):
         self.df = None
 
     def data(self, *args, **kwargs):
+        force_refresh = kwargs.get('force_refresh', False)
         cache_duration = self.cache_duration
-        if (pytz.utc.localize(datetime.now()).astimezone(localtz)  - self.last_retrieval) > timedelta(seconds=cache_duration):
+
+        if force_refresh:
+            refresh = True
+        elif (pytz.utc.localize(datetime.now()).astimezone(localtz) - self.last_retrieval) > timedelta(seconds=cache_duration):
+            refresh = True
+        else:
+            refresh = False
+
+        if refresh:
             self.last_retrieval = pytz.utc.localize(datetime.now()).astimezone(localtz)
             self.df = self._get_data(*args, **kwargs)
         return self.df
 
-    def _get_data(self):
+    def _get_data(self, **kwargs):
         pass
 
 
@@ -33,7 +42,7 @@ class RawDataFrame(Cache):
     def __init__(self, *args, **kwargs):
         super(RawDataFrame, self).__init__(*args, **kwargs)
 
-    def _get_data(self, lookback=3):
+    def _get_data(self, lookback=3,**kwargs):
         return get_dataframe(lookback)
 
 
@@ -41,7 +50,7 @@ class PlotDataFrame(Cache):
     def __init__(self, *args, **kwargs):
         super(PlotDataFrame, self).__init__(*args, **kwargs)
 
-    def _get_data(self, lookback=3):
+    def _get_data(self, lookback=3, **kwargs):
         return get_plotting_dataframe(hours=lookback)
 
 
@@ -49,22 +58,23 @@ class RecentTemperature(Cache):
     def __init__(self, *args, **kwargs):
         super(RecentTemperature, self).__init__(*args, **kwargs)
 
-    def _get_data(self):
-        df = get_plotting_dataframe(hours=3, resolution='10S')
+    def _get_data(self, **kwargs):
+        df = get_plotting_dataframe(hours=3, resolution='60S')
         df = df.dropna().resample('60S').last()
         return df
 
 
 data = RawDataFrame()
 chart_data = PlotDataFrame()
-last_data = RecentTemperature(cache_duration_seconds=10)
+last_data = RecentTemperature(cache_duration_seconds=0)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='/static')
 
 
 def current_temp_chart(chartID, chart_height, chart_type):
-    data1 = last_data.data().ix[-1, :].fillna(0)
-    data2 = last_data.data().ix[0, :].fillna(0)
+    temp = last_data.data()
+    data1 = temp.ix[-1, :].fillna(0)
+    data2 = temp.ix[0, :].fillna(0)
     chart = {
         "renderTo": chartID,
         "type": chart_type,
@@ -128,10 +138,13 @@ def current_temp_chart(chartID, chart_height, chart_type):
     return chart
 
 
-def temp_history_chart(chartID, chart_height):
-    data = chart_data.data(lookback=24).dropna()
+def temp_history_chart(chartID, chart_height, lookback):
+
+    data = chart_data.data(lookback=lookback, force_refresh=True).dropna()
+
     localtz = pytz.timezone('America/New_York')
     utctz = pytz.timezone('UTC')
+
     chart = {
         "renderTo": chartID,
         "type": 'line',
@@ -182,6 +195,8 @@ def temp_history_chart(chartID, chart_height):
 @app.route('/')
 @app.route('/index')
 def index(chart_height=400):
+    lookback = int(request.args.get('lookback', default=24))
+
     charts = []
 
     charts.append(
@@ -189,7 +204,7 @@ def index(chart_height=400):
     )
 
     charts.append(
-        temp_history_chart('History', chart_height)
+        temp_history_chart('History', chart_height, lookback)
     )
 
     return render_template('index.html', charts=charts)

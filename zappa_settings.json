@@ -1,6 +1,9 @@
 {
     "dev": {
         "app_function": "app.app", 
-        "s3_bucket": "zappa-rd50b1dj5"
+        "s3_bucket": "zappa-rd50b1dj5",
+        "environment_variables": {
+            "localtz": "America/New_York"
+        }
     }
 }
