@@ -60,7 +60,7 @@ class RecentTemperature(Cache):
 
     def _get_data(self, **kwargs):
         df = get_plotting_dataframe(hours=3, resolution='60S')
-        df = df.dropna().resample('60S').last()
+        df = df.resample('60S').last()
         return df
 
 
@@ -140,7 +140,7 @@ def current_temp_chart(chartID, chart_height, chart_type):
 
 def temp_history_chart(chartID, chart_height, lookback):
 
-    data = chart_data.data(lookback=lookback, force_refresh=True).dropna()
+    data = chart_data.data(lookback=lookback, force_refresh=True).ffill()
 
     localtz = pytz.timezone('America/New_York')
     utctz = pytz.timezone('UTC')
