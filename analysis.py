@@ -23,6 +23,6 @@ def get_dataframe(hours=24, user=1):
     return df
 
 def get_plotting_dataframe(hours=24, user=1, resolution='60S'):
-    df = get_dataframe(hours=hours, user=user).resample(resolution).median()
+    df = get_dataframe(hours=hours, user=user).resample(resolution).median().ffill(limit=1)
     df[ np.abs( df.ffill() - df.ffill().rolling(5).median() ) > 5 ] = np.nan
     return df
