@@ -1,4 +1,4 @@
-from analysis import get_plotting_dataframe, get_dataframe
+from analysis import get_plotting_dataframe, get_dataframe, get_action_status
 from models import *
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
@@ -9,13 +9,14 @@ from local_settings import LOCALTZ
 
 localtz = pytz.timezone(LOCALTZ)
 
+
 class Cache(object):
     def __init__(self, cache_duration_seconds=60):
         """
         :param cache_duration_seconds: duration of cached in seconds
         """
         self.cache_duration = cache_duration_seconds
-        self.last_retrieval = pytz.utc.localize(datetime.now()).astimezone(localtz)  - timedelta(days=1000)
+        self.last_retrieval = pytz.utc.localize(datetime.now()).astimezone(localtz) - timedelta(days=1000)
         self.df = None
 
     def data(self, *args, **kwargs):
@@ -42,7 +43,7 @@ class RawDataFrame(Cache):
     def __init__(self, *args, **kwargs):
         super(RawDataFrame, self).__init__(*args, **kwargs)
 
-    def _get_data(self, lookback=3,**kwargs):
+    def _get_data(self, lookback=3, **kwargs):
         return get_dataframe(lookback)
 
 
@@ -51,7 +52,7 @@ class PlotDataFrame(Cache):
         super(PlotDataFrame, self).__init__(*args, **kwargs)
 
     def _get_data(self, lookback=3, **kwargs):
-        return get_plotting_dataframe(hours=lookback, zone=kwargs.get('zone', None), user=kwargs.get('user',None))
+        return get_plotting_dataframe(user=kwargs.get('user', None), hours=lookback, zone=kwargs.get('zone', None))
 
 
 class RecentTemperature(Cache):
@@ -59,14 +60,15 @@ class RecentTemperature(Cache):
         super(RecentTemperature, self).__init__(*args, **kwargs)
 
     def _get_data(self, **kwargs):
-        df = get_plotting_dataframe(hours=3, resolution='60S', zone=kwargs.get('zone', None), user=kwargs.get('user',None))
+        df = get_plotting_dataframe(user=kwargs.get('user', None), hours=3, resolution='60S',
+                                    zone=kwargs.get('zone', None))
         df = df.resample('60S').last()
         return df
 
 
 data = RawDataFrame()
 chart_data = PlotDataFrame()
-last_data = RecentTemperature(cache_duration_seconds=0)
+last_data = RecentTemperature(cache_duration_seconds=5)
 
 app = Flask(__name__, static_folder='/static')
 
@@ -192,6 +194,16 @@ def temp_history_chart(chartID, chart_height, lookback, user, zone=None):
     return chart
 
 
+def action_status(user):
+    last_action = get_action_status(user)
+    status_list = []
+    for action in last_action:
+        status = 'on' if action.value == 1 else 'off'
+        time = action.record_time.strftime('%m/%d/%Y %H:%M:%S')
+        status_list.append(('{0} {1}: is {2} as of {3}.'.format(action.unit, action.name.title(), status, time)))
+    return status_list
+
+
 def check_api_key(user, key):
     session = get_session()
     results = session.query(User).filter(User.id==user).all()[0]
@@ -224,7 +236,9 @@ def index(chart_height=400):
         temp_history_chart('History', chart_height, lookback, user, zone=zone)
     )
 
-    return render_template('index.html', charts=charts)
+    status = action_status(user)
+
+    return render_template('index.html', charts=charts, status=status)
 
 
 @app.route('/raw')
