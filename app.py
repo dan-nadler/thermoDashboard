@@ -192,12 +192,25 @@ def temp_history_chart(chartID, chart_height, lookback, user, zone=None):
     return chart
 
 
+def check_api_key(user, key):
+    session = get_session()
+    results = session.query(User).filter(User.id==user).all()[0]
+    session.close()
+
+    if results.api_key == key:
+        return
+    else:
+        raise Exception('Invalid API Key')
+
 @app.route('/')
 @app.route('/index')
 def index(chart_height=400):
     lookback = int(request.args.get('lookback', default=24))
     zone = request.args.get('zone', default=None)
     user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
+
     if zone is not None:
         zone = int(zone)
 
@@ -216,16 +229,25 @@ def index(chart_height=400):
 
 @app.route('/raw')
 def raw():
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
     return data.data().to_html()
 
 
 @app.route('/chart-data/')
 def plot():
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
     return chart_data.data().to_html()
 
 
 @app.route('/last-data')
 def last():
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
     return last_data.data().to_frame().to_html()
 
 
