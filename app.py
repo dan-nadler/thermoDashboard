@@ -51,7 +51,7 @@ class PlotDataFrame(Cache):
         super(PlotDataFrame, self).__init__(*args, **kwargs)
 
     def _get_data(self, lookback=3, **kwargs):
-        return get_plotting_dataframe(hours=lookback)
+        return get_plotting_dataframe(hours=lookback, zone=kwargs.get('zone', None))
 
 
 class RecentTemperature(Cache):
@@ -59,8 +59,8 @@ class RecentTemperature(Cache):
         super(RecentTemperature, self).__init__(*args, **kwargs)
 
     def _get_data(self, **kwargs):
-        df = get_plotting_dataframe(hours=3, resolution='60S')
-        df = df.dropna().resample('60S').last()
+        df = get_plotting_dataframe(hours=3, resolution='60S', zone=kwargs.get('zone', None))
+        df = df.resample('60S').last()
         return df
 
 
@@ -71,8 +71,8 @@ last_data = RecentTemperature(cache_duration_seconds=0)
 app = Flask(__name__, static_folder='/static')
 
 
-def current_temp_chart(chartID, chart_height, chart_type):
-    temp = last_data.data()
+def current_temp_chart(chartID, chart_height, chart_type, zone=None):
+    temp = last_data.data(zone=zone)
     data1 = temp.ix[-1, :].fillna(0)
     data2 = temp.ix[0, :].fillna(0)
     chart = {
@@ -138,9 +138,9 @@ def current_temp_chart(chartID, chart_height, chart_type):
     return chart
 
 
-def temp_history_chart(chartID, chart_height, lookback):
+def temp_history_chart(chartID, chart_height, lookback, zone=None):
 
-    data = chart_data.data(lookback=lookback, force_refresh=True).dropna()
+    data = chart_data.data(lookback=lookback, force_refresh=True, zone=zone).ffill()
 
     localtz = pytz.timezone('America/New_York')
     utctz = pytz.timezone('UTC')
@@ -196,15 +196,18 @@ def temp_history_chart(chartID, chart_height, lookback):
 @app.route('/index')
 def index(chart_height=400):
     lookback = int(request.args.get('lookback', default=24))
+    zone = request.args.get('zone', default=None)
+    if zone is not None:
+        zone = int(zone)
 
     charts = []
 
     charts.append(
-        current_temp_chart('Current', chart_height, 'bar')
+        current_temp_chart('Current', chart_height, 'bar', zone=zone)
     )
 
     charts.append(
-        temp_history_chart('History', chart_height, lookback)
+        temp_history_chart('History', chart_height, lookback, zone=zone)
     )
 
     return render_template('index.html', charts=charts)
