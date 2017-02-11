@@ -1,4 +1,4 @@
-from analysis import get_plotting_dataframe, get_dataframe
+from analysis import get_plotting_dataframe, get_dataframe, get_action_status
 from models import *
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
@@ -9,13 +9,14 @@ from local_settings import LOCALTZ
 
 localtz = pytz.timezone(LOCALTZ)
 
+
 class Cache(object):
     def __init__(self, cache_duration_seconds=60):
         """
         :param cache_duration_seconds: duration of cached in seconds
         """
         self.cache_duration = cache_duration_seconds
-        self.last_retrieval = pytz.utc.localize(datetime.now()).astimezone(localtz)  - timedelta(days=1000)
+        self.last_retrieval = pytz.utc.localize(datetime.now()).astimezone(localtz) - timedelta(days=1000)
         self.df = None
 
     def data(self, *args, **kwargs):
@@ -42,7 +43,7 @@ class RawDataFrame(Cache):
     def __init__(self, *args, **kwargs):
         super(RawDataFrame, self).__init__(*args, **kwargs)
 
-    def _get_data(self, lookback=3,**kwargs):
+    def _get_data(self, lookback=3, **kwargs):
         return get_dataframe(lookback)
 
 
@@ -51,7 +52,7 @@ class PlotDataFrame(Cache):
         super(PlotDataFrame, self).__init__(*args, **kwargs)
 
     def _get_data(self, lookback=3, **kwargs):
-        return get_plotting_dataframe(hours=lookback, zone=kwargs.get('zone', None))
+        return get_plotting_dataframe(user=kwargs.get('user', None), hours=lookback, zone=kwargs.get('zone', None))
 
 
 class RecentTemperature(Cache):
@@ -59,20 +60,21 @@ class RecentTemperature(Cache):
         super(RecentTemperature, self).__init__(*args, **kwargs)
 
     def _get_data(self, **kwargs):
-        df = get_plotting_dataframe(hours=3, resolution='60S', zone=kwargs.get('zone', None))
+        df = get_plotting_dataframe(user=kwargs.get('user', None), hours=3, resolution='60S',
+                                    zone=kwargs.get('zone', None))
         df = df.resample('60S').last()
         return df
 
 
 data = RawDataFrame()
 chart_data = PlotDataFrame()
-last_data = RecentTemperature(cache_duration_seconds=0)
+last_data = RecentTemperature(cache_duration_seconds=5)
 
 app = Flask(__name__, static_folder='/static')
 
 
-def current_temp_chart(chartID, chart_height, chart_type, zone=None):
-    temp = last_data.data(zone=zone)
+def current_temp_chart(chartID, chart_height, chart_type, user, zone=None):
+    temp = last_data.data(zone=zone, user=user)
     data1 = temp.ix[-1, :].fillna(0)
     data2 = temp.ix[0, :].fillna(0)
     chart = {
@@ -138,9 +140,9 @@ def current_temp_chart(chartID, chart_height, chart_type, zone=None):
     return chart
 
 
-def temp_history_chart(chartID, chart_height, lookback, zone=None):
+def temp_history_chart(chartID, chart_height, lookback, user, zone=None):
 
-    data = chart_data.data(lookback=lookback, force_refresh=True, zone=zone).ffill()
+    data = chart_data.data(lookback=lookback, force_refresh=True, zone=zone, user=user).ffill()
 
     localtz = pytz.timezone('America/New_York')
     utctz = pytz.timezone('UTC')
@@ -192,39 +194,74 @@ def temp_history_chart(chartID, chart_height, lookback, zone=None):
     return chart
 
 
+def action_status(user):
+    last_action = get_action_status(user)
+    status_list = []
+    for action in last_action:
+        status = 'on' if action.value == 1 else 'off'
+        time = action.record_time.strftime('%m/%d/%Y %H:%M:%S')
+        status_list.append(('{0} {1}: is {2} as of {3}.'.format(action.unit, action.name.title(), status, time)))
+    return status_list
+
+
+def check_api_key(user, key):
+    session = get_session()
+    results = session.query(User).filter(User.id==user).all()[0]
+    session.close()
+
+    if results.api_key == key:
+        return
+    else:
+        raise Exception('Invalid API Key')
+
 @app.route('/')
 @app.route('/index')
 def index(chart_height=400):
     lookback = int(request.args.get('lookback', default=24))
     zone = request.args.get('zone', default=None)
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
+
     if zone is not None:
         zone = int(zone)
 
     charts = []
 
     charts.append(
-        current_temp_chart('Current', chart_height, 'bar', zone=zone)
+        current_temp_chart('Current', chart_height, 'bar', user, zone=zone)
     )
 
     charts.append(
-        temp_history_chart('History', chart_height, lookback, zone=zone)
+        temp_history_chart('History', chart_height, lookback, user, zone=zone)
     )
 
-    return render_template('index.html', charts=charts)
+    status = action_status(user)
+
+    return render_template('index.html', charts=charts, status=status)
 
 
 @app.route('/raw')
 def raw():
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
     return data.data().to_html()
 
 
 @app.route('/chart-data/')
 def plot():
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
     return chart_data.data().to_html()
 
 
 @app.route('/last-data')
 def last():
+    user = request.args.get('user')
+    api_key = request.args.get('key')
+    check_api_key(user, api_key)
     return last_data.data().to_frame().to_html()
 
 
