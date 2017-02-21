@@ -6,6 +6,7 @@ import time
 import pytz
 from flask import Flask, render_template, request
 from local_settings import LOCALTZ
+from api import set_constant_temperature
 
 localtz = pytz.timezone(LOCALTZ)
 
@@ -239,6 +240,21 @@ def index(chart_height=400):
     status = action_status(user)
 
     return render_template('index.html', charts=charts, status=status)
+
+
+@app.route('/set')
+def set_temperature():
+    user = request.args.get('user')
+    key = request.args.get('key')
+    check_api_key(user, key)
+
+    zone = request.args.get('zone')
+    target = request.args.get('temperature')
+    hours = request.args.get('hours')
+    expiration = datetime.now() + timedelta(hours=int(hours))
+
+    set_constant_temperature(user, zone, target, expiration)
+    return render_template('index.html', status='New temperature set.')
 
 
 @app.route('/raw')
