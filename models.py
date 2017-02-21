@@ -8,11 +8,11 @@ def get_engine():
     connection_string = '{0}://{1}:{2}@{3}:{4}/{5}'.format(
         DATABASE.TYPE, DATABASE.USERNAME, DATABASE.PASSWORD, DATABASE.HOST, DATABASE.PORT, DATABASE.NAME
     )
+
     engine = create_engine(connection_string, echo=False)
     return engine
 
-
-def get_session():
+def get_session(engine):
     engine = get_engine()
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -26,7 +26,7 @@ class Temperature(Base):
     __tablename__ = 'temperature'
     id = Column(Integer, autoincrement=True, index=True)
     value = Column(Float)
-    record_time = Column(DateTime, primary_key=True)
+    record_time = Column(DateTime, primary_key=True, index=True)
     location = Column(String(250))
     sensor = Column(Integer, ForeignKey('sensor.id'), primary_key=True, index=True)
 
@@ -71,15 +71,13 @@ class User(Base):
 class ThermostatSchedule(Base):
     __tablename__ = 'thermostat_schedule'
     id = Column(Integer, autoincrement=True, primary_key=True, index=True)
-    day = Column(Integer, index=True, nullable=False)
-    hour = Column(Integer, index=True, nullable=False)
-    minute = Column(Integer, index=True, nullable=False)
-    target = Column(Float, nullable=False)
     user = Column(Integer, ForeignKey('user.id'), nullable=False)
     zone = Column(Integer, ForeignKey('zone.id'), nullable=False)
+    schedule = Column(BLOB, nullable=False)
+    name = Column(String(250))
 
     def __repr__(self):
-        return "Zone {0}: {1} @ {2}:{3}".format(self.zone, self.target, self.hour, self.minute)
+        return "{0} for zone {1} for user {2}".format(self.name, self.zone, self.user)
 
 
 class Zone(Base):
@@ -138,7 +136,7 @@ class Unit(Base):
 class Message(Base):
     __tablename__ = 'message'
     id = Column(Integer, autoincrement=True, primary_key=True, index=True)
-    record_time = Column(DateTime, primary_key=True)
+    record_time = Column(DateTime)
     user = Column(Integer, ForeignKey('user.id'), index=True)
     json = Column(BLOB, nullable=False)
     received = Column(Boolean, nullable=False, default=False)

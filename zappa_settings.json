@@ -1,24 +1,23 @@
 {
-    "dev": {
-        "app_function": "app.app", 
-        "s3_bucket": "zappa-rd50b1dj5",
-        "environment_variables": {
-            "localtz": "America/New_York"
-        },
-        "domain": "thermo.dev.lunchmodel.com",
-        "lets_encrypt_key": "account.key",
-        "route53_enabled": true
+  "dev": {
+    "app_function": "app.app",
+    "s3_bucket": "zappa-rd50b1dj5",
+    "environment_variables": {
+      "localtz": "America/New_York"
     },
-
-    "prod" : {
-        "app_function": "app.app",
-        "s3_bucket": "thermo-bucket-prod",
-        "environment_variables": {
-            "localtz": "America/New_York"
-        },
-        "domain": "thermo.lunchmodel.com",
-        "lets_encrypt_key": "account.key",
-        "lambda_description": "thermoMonitor - Production",
-        "route53_enabled": true
-    }
+    "domain": "thermo.dev.lunchmodel.com",
+    "lets_encrypt_key": "account.key",
+    "route53_enabled": true
+  },
+  "prod": {
+    "app_function": "app.app",
+    "s3_bucket": "thermo-bucket-prod",
+    "environment_variables": {
+      "localtz": "America/New_York"
+    },
+    "domain": "thermo.lunchmodel.com",
+    "lets_encrypt_key": "account.key",
+    "lambda_description": "thermoMonitor - Production",
+    "route53_enabled": true
+  }
 }
