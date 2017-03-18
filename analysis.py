@@ -13,7 +13,7 @@ def get_dataframe(hours=24, user=1, zone=None):
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    q = session.query(Temperature)\
+    q = session.query(Temperature.record_time, Temperature.location, (Temperature.value - Sensor.bias).label('value'))\
         .filter(Temperature.record_time >= pytz.utc.localize(datetime.now()).astimezone(localtz) - timedelta(hours=hours))\
         .join(Sensor).filter(Sensor.user==user)
     if zone is not None:

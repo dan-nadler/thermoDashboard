@@ -12,7 +12,8 @@ def get_engine():
     engine = create_engine(connection_string, echo=False)
     return engine
 
-def get_session(engine):
+
+def get_session():
     engine = get_engine()
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -46,6 +47,7 @@ class Sensor(Base):
     unit = Column(Integer, ForeignKey('unit.id'), index=True)
     indoors = Column(Boolean, default=1, nullable=False)
     zone = Column(Integer, ForeignKey('zone.id'), index=True)
+    bias = Column(Float, nullable=False, default=0)
 
     def __repr__(self):
         return self.location
@@ -75,6 +77,7 @@ class ThermostatSchedule(Base):
     zone = Column(Integer, ForeignKey('zone.id'), nullable=False)
     schedule = Column(BLOB, nullable=False)
     name = Column(String(250))
+    active = Column(Boolean, default=0, nullable=False)
 
     def __repr__(self):
         return "{0} for zone {1} for user {2}".format(self.name, self.zone, self.user)
@@ -114,7 +117,6 @@ class Action(Base):
     zone = Column(Integer, ForeignKey('zone.id'), index=True)
     expected_overshoot_above = Column(Float, nullable=False, default=0.)
     expected_overshoot_below = Column(Float, nullable=False, default=0.)
-
 
     def __repr__(self):
         return "{0}: {1} {2} {3}".format(self.id, self.name, self.unit, self.zone)
