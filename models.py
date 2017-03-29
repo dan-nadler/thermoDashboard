@@ -48,6 +48,7 @@ class Sensor(Base):
     indoors = Column(Boolean, default=1, nullable=False)
     zone = Column(Integer, ForeignKey('zone.id'), index=True)
     bias = Column(Float, nullable=False, default=0)
+    warning_level = Column(Integer)
 
     def __repr__(self):
         return self.location
@@ -65,6 +66,7 @@ class User(Base):
     last_name = Column(String(150))
     address = Column(String(250))
     api_key = Column(String(250))
+    email = Column(String(250))
 
     def __repr__(self):
         return "{0}: {1} {2}".format(self.id, self.first_name, self.last_name)

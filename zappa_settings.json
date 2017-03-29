@@ -7,7 +7,13 @@
     },
     "domain": "thermo.dev.lunchmodel.com",
     "lets_encrypt_key": "account.key",
-    "route53_enabled": true
+    "route53_enabled": true,
+    "events": [
+      {
+        "function": "emails.main",
+        "expression": "rate(15 minutes)"
+      }
+    ]
   },
   "prod": {
     "app_function": "app.app",
